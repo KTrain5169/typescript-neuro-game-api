@@ -1,6 +1,10 @@
 # TypeScript Neuro Game API
 
-A TypeScript/JavaScript API implementation of the Neuro Game API server. This implementation is based on the [official implementation of the Neuro Game API](https://github.com/VedalAI/neuro-sdk/blob/main/API/SPECIFICATION.md) and was inspired by [CoolCat467's server-side implementation in the Python SDK](https://github.com/CoolCat467/Neuro-API/blob/main/src/neuro_api/server.py)
+A TypeScript/JavaScript API implementation of the Neuro Game API server. This implementation is based on the [official implementation of the Neuro Game API](https://github.com/VedalAI/neuro-sdk/blob/main/API/SPECIFICATION.md) and was inspired by [CoolCat467's server-side implementation in the Python SDK](https://github.com/CoolCat467/Neuro-API/blob/main/src/neuro_api/server.py).
+
+> [!NOTE]
+> If you are trying to build an integration for Neuro, you're looking for the [`neuro-game-sdk` package](https://ithub.com/AriesAlex/typescript-neuro-game-sdk) instead.
+> This package is for server-side implementations of the Neuro API.
 
 ## Installation & Usage
 
