@@ -1,0 +1,45 @@
+{
+  "name": "neuro-game-api",
+  "version": "0.1.1",
+  "description": "A JavaScript/TypeScript server-side API implementation of the Neuro Game API.",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "prepack": "pnpm build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KTrain5169/typescript-neuro-game-api"
+  },
+  "readme": "./README.md",
+  "keywords": [],
+  "author": "KTrain5169",
+  "license": "MIT",
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@rollup/plugin-commonjs": "^21.1.0",
+    "@rollup/plugin-node-resolve": "^13.3.0",
+    "@rollup/plugin-typescript": "^8.5.0",
+    "@types/body-parser": "^1.19.6",
+    "@types/express": "^5.0.4",
+    "@types/json-schema": "^7.0.15",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.18.1",
+    "body-parser": "^2.2.0",
+    "express": "^5.1.0",
+    "json-schema-faker": "^0.5.9",
+    "rollup": "^2.79.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "tslib": "^2.8.1",
+    "ws": "^8.18.3"
+  }
+}

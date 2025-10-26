@@ -1,0 +1,41 @@
+name: Build API
+
+on:
+    push:
+        paths-ignore:
+            - 'examples/**'
+    pull_request:
+        paths-ignore:
+            - 'examples/**'
+
+jobs:
+    api:
+        name: Build server API
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+            
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                version: 10.18.1
+            
+            - name: Setup Node.js
+              uses: actions/setup-node@v5
+              with:
+                node-version: 22.14.0
+                cache: 'pnpm'
+                cache-dependency-path: './pnpm-lock.yaml'
+            
+            - name: Install deps
+              run: pnpm install --frozen-lockfile
+            
+            - name: Build API
+              run: pnpm api pack
+            
+            - name: Upload API
+              uses: actions/upload-artifact@v4
+              with:
+                name: JS-TS server API ${{ github.sha }}
+                path: neuro-game-api-*.tgz
