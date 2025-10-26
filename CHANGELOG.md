@@ -1,5 +1,12 @@
 # neuro-game-api
 
+## 0.1.2
+
+### Patch Changes
+
+- 8fe4c38: Migrated to new repository.
+  Remove unused import.
+
 ## 0.1.0
 
 ### Minor Changes
