@@ -19,7 +19,11 @@
   },
   "readme": "./README.md",
   "keywords": [],
-  "author": "KTrain5169",
+  "author": {
+    "name": "ktrain5369",
+    "email": "me@git.ktrain5369.dev",
+    "url": "https://ktrain5369.dev"
+  },
   "license": "MIT",
   "devDependencies": {
     "@changesets/cli": "^2.29.7",
