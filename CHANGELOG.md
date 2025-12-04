@@ -1,5 +1,11 @@
 # neuro-game-api
 
+## 0.1.3
+
+### Patch Changes
+
+- bcb4827: Move tslib dependency to devDependencies
+
 ## 0.1.2
 
 ### Patch Changes
