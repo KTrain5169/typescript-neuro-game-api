@@ -1,5 +1,15 @@
 # neuro-game-api
 
+## 0.2.0
+
+### Minor Changes
+
+- 18a8962: You can now register error handlers using `NeuroServer.setErrorHandlers`.
+
+### Patch Changes
+
+- 18a8962: You can now toggle whether or not you want to detect dead connections
+
 ## 0.1.3
 
 ### Patch Changes
