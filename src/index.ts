@@ -13,7 +13,9 @@ export interface ExtraConfigOptions {
     /** Whether this is a test mode. Useful for automated testing purposes. */
     test?: boolean
     /** Whether or not the server should support multi-connects. Defaults to `false` since for most purposes you shouldn't be needing this. */
-    multiConnect?: boolean
+    multiConnect?: boolean;
+    /** Whether or not to automatically detect dead connections. Defaults to `false`. */
+    autoDetectDeadConnects?: boolean;
 }
 
 // Message types (what the server sends TO games)
@@ -40,6 +42,14 @@ export interface ServerEventHandlers {
     onActionResult?: (gameName: string, actionId: string, success: boolean, message?: string) => void
 }
 
+// Error handlers for server errors
+export interface ServerErrorHandlers {
+    onMessageParseError?: (error: Error, rawData: Buffer, connection: ClientConnection) => void
+    onCommandHandlerError?: (error: Error, command: string, data: any, connection: ClientConnection) => void
+    onConnectionError?: (error: Error, connection: ClientConnection) => void
+    onServerError?: (error: Error) => void
+}
+
 // Command handler for incoming messages from games
 export class CommandHandler {
     private handlers: Map<string, (data: any, connection: ClientConnection) => Promise<void>> = new Map()
@@ -48,13 +58,16 @@ export class CommandHandler {
         this.handlers.set(command, handler)
     }
 
-    async handle(command: string, data: any, connection: ClientConnection): Promise<void> {
+    async handle(command: string, data: any, connection: ClientConnection, onError?: (error: Error, command: string, data: any, connection: ClientConnection) => void): Promise<void> {
         const handler = this.handlers.get(command)
         if (handler) {
             try {
                 await handler(data, connection)
             } catch (error) {
                 console.error(`Error handling command ${command}:`, error)
+                if (onError && error instanceof Error) {
+                    onError(error, command, data, connection)
+                }
             }
         } else {
             console.warn(`Unknown command: ${command}`)
@@ -76,6 +89,8 @@ export class NeuroServer {
     private connectionIdCounter = 0
     /** Event handlers */
     private readonly eventHandlers: ServerEventHandlers = {}
+    /** Error handlers */
+    private readonly errorHandlers: ServerErrorHandlers = {}
     /**
      * Extra configuration options for this server.
      * See {@link ExtraConfigOptions} for these config types.
@@ -87,7 +102,7 @@ export class NeuroServer {
      * @param host The host to spawn the socket server on.
      * @param port The port to spawn the socket server on.
      * @param onStartup A function to run when the server starts listening.
-     * @param extraConfigs Extra configuration options. Currently unused.
+     * @param extraConfigs Extra configuration options. Currently mostly unused.
      */
     constructor(host = "127.0.0.1", port = 8000, onStartup?: () => void, extraConfigs?: ExtraConfigOptions) {
         if (extraConfigs) this.extraConfigs = extraConfigs
@@ -101,6 +116,11 @@ export class NeuroServer {
     /** Set event handlers for server events */
     public setEventHandlers(handlers: ServerEventHandlers): void {
         Object.assign(this.eventHandlers, handlers)
+    }
+
+    /** Set error handlers for server errors */
+    public setErrorHandlers(handlers: ServerErrorHandlers): void {
+        Object.assign(this.errorHandlers, handlers)
     }
 
     /** Get all actions for a specific game */
@@ -194,6 +214,9 @@ export class NeuroServer {
                     await this.handleIncomingMessage(message, connection)
                 } catch (error) {
                     console.error(`Error parsing message from connection ${connectionId}:`, error)
+                    if (this.errorHandlers.onMessageParseError && error instanceof Error) {
+                        this.errorHandlers.onMessageParseError(error, data, connection)
+                    }
                 }
             })
 
@@ -204,6 +227,9 @@ export class NeuroServer {
 
             socket.on('error', (error) => {
                 console.error(`Connection ${connectionId} error:`, error)
+                if (this.errorHandlers.onConnectionError) {
+                    this.errorHandlers.onConnectionError(error, connection)
+                }
             })
 
             socket.on('pong', () => {
@@ -217,6 +243,13 @@ export class NeuroServer {
         this.wss.on('listening', () => {
             const address = this.wss.address()
             onStartup?.()
+        })
+
+        this.wss.on('error', (error) => {
+            console.error('WebSocket server error:', error)
+            if (this.errorHandlers.onServerError) {
+                this.errorHandlers.onServerError(error)
+            }
         })
     }
 
@@ -323,12 +356,18 @@ export class NeuroServer {
             connection.gameName = message.game
         }
 
-        await this.commandHandler.handle(message.command, message.data, connection)
+        await this.commandHandler.handle(
+            message.command,
+            message.data,
+            connection,
+            this.errorHandlers.onCommandHandlerError
+        )
     }
 
     /** Start heartbeat to detect dead connections */
     private startHeartbeat(): void {
         setInterval(() => {
+            if (!this.extraConfigs?.autoDetectDeadConnects) return;
             this.connections.forEach((connection, id) => {
                 if (!connection.isAlive) {
                     console.log(`Connection ${id} failed heartbeat, terminating`)
