@@ -1,5 +1,11 @@
 # neuro-game-api
 
+## 0.3.0
+
+### Minor Changes
+
+- ab296b1: Pass new priority level parameter on action forces to the action force handler, defaults to low
+
 ## 0.2.0
 
 ### Minor Changes
