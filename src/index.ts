@@ -38,7 +38,7 @@ export interface ServerEventHandlers {
     onGameContext?: (gameName: string, message: string, silent: boolean, connection: ClientConnection) => void
     onActionsRegistered?: (gameName: string, actions: Action[], connection: ClientConnection) => void
     onActionsUnregistered?: (gameName: string, actionNames: string[], connection: ClientConnection) => void
-    onActionsForce?: (gameName: string, query: string, actionNames: string[], state?: string, ephemeralContext?: boolean) => void
+    onActionsForce?: (gameName: string, query: string, actionNames: string[], state?: string, ephemeralContext?: boolean, priority?: ActionForcePriority) => void
     onActionResult?: (gameName: string, actionId: string, success: boolean, message?: string) => void
 }
 
@@ -74,6 +74,8 @@ export class CommandHandler {
         }
     }
 }
+
+export type ActionForcePriority = "low" | "medium" | "high" | "critical"
 
 /** The NeuroServer is a class that receives connections from games and acts as Neuro */
 export class NeuroServer {
@@ -325,11 +327,12 @@ export class NeuroServer {
             const query: string = data?.query || ''
             const state: string | undefined = data?.state
             const ephemeralContext: boolean = data?.ephemeral_context || false
+            const priority: ActionForcePriority = data?.priority || 'low'
 
             console.log(`Action force from ${connection.gameName}: ${query} (actions: ${actionNames.join(', ')})`)
 
             // Call event handler if defined
-            this.eventHandlers.onActionsForce?.(connection.gameName, query, actionNames, state, ephemeralContext)
+            this.eventHandlers.onActionsForce?.(connection.gameName, query, actionNames, state, ephemeralContext, priority)
         })
 
         // Handle action results (game reporting action execution result)
