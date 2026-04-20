@@ -6,12 +6,15 @@
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "prepack": "pnpm build"
+    "prepack": "pnpm build",
+    "version": "changeset version && node ./jsr-version.mjs",
+    "publish": "pnpm publish && pnpm dlx jsr publish"
   },
   "repository": {
     "type": "git",

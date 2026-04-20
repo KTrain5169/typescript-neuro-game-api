@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: neuro-game-api
-      url: https://npmjs.com/package/neuro-game-api
+      url: https://npmx.dev/package/neuro-game-api
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,7 +46,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          publish: pnpm publish
+          publish: pnpm run publish
+          version: pnpm run version
           commit: "chore: version packages"
           title: "chore: version packages"
         env:

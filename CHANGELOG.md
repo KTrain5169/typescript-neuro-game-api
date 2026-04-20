@@ -1,3 +1,5 @@
+<!-- markdownlint-disable -->
+
 # neuro-game-api
 
 ## 0.3.0

@@ -1,0 +1,9 @@
+{
+    "name": "@neurosama/game-api",
+    "version": "0.3.0",
+    "exports": "./src/index.ts",
+    "license": "MIT",
+    "publish": {
+        "include": ["src/index.ts", "jsr.json", "package.json", "LICENSE", "README.md", "CHANGELOG.md"]
+    }
+}
