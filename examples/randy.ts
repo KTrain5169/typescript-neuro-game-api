@@ -1,7 +1,7 @@
 import express from "express"
 import pkg from "body-parser"
 import { NeuroServer, type OutgoingMessage } from "../src"
-import { JSONSchemaFaker } from "json-schema-faker"
+import { generate } from "json-schema-faker"
 import util from "util"
 
 const { json } = pkg
@@ -88,7 +88,7 @@ server['commandHandler'].registerHandler('action/result', async (data: any) => {
     await onMessageReceived({ command: 'action/result', data })
 })
 
-function sendAction(actionName: string) {
+async function sendAction(actionName: string) {
     const id = Math.random().toString()
 
     if (actionName == "choose_name") {
@@ -99,7 +99,7 @@ function sendAction(actionName: string) {
     const action = actions.find(a => a.name === actionName)
     if (!action) return
 
-    const responseObj = !action?.schema ? undefined : JSON.stringify(JSONSchemaFaker.generate(action.schema))
+    const responseObj = !action?.schema ? undefined : JSON.stringify(await generate(action.schema))
 
     send({ command: "action", data: { id, name: action.name, data: responseObj } })
 }
