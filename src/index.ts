@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws'
+import crypto from 'node:crypto';
 import type { JSONSchema7 } from 'json-schema'
 import type { IncomingMessage as HttpIncomingMessage } from 'http'
 
@@ -10,6 +11,8 @@ export interface Action {
 }
 
 export interface ExtraConfigOptions {
+    /** A function that is ran upon the server starting successfully. */
+    onStartup?: () => void
     /** Whether this is a test mode. Useful for automated testing purposes. */
     test?: boolean
     /** Whether or not the server should support multi-connects. Defaults to `false` since for most purposes you shouldn't be needing this. */
@@ -26,7 +29,7 @@ export interface OutgoingMessage {
 
 // Connection interface
 export interface ClientConnection {
-    id: number
+    id: string
     socket: WebSocket
     gameName?: string
     isAlive: boolean
@@ -34,7 +37,7 @@ export interface ClientConnection {
 
 // Event handlers for server events
 export interface ServerEventHandlers {
-    onGameStartup?: (gameName: string, connection: ClientConnection) => void
+    onGameStartup?: (gameName: string, connection: ClientConnection) => { characterId: string; displayName: string; } | void
     onGameContext?: (gameName: string, message: string, silent: boolean, connection: ClientConnection) => void
     onActionsRegistered?: (gameName: string, actions: Action[], connection: ClientConnection) => void
     onActionsUnregistered?: (gameName: string, actionNames: string[], connection: ClientConnection) => void
@@ -84,11 +87,9 @@ export class NeuroServer {
     /** Actions currently registered per game */
     private readonly gameActions: Map<string, Map<string, Action>> = new Map()
     /** Currently connected clients */
-    private readonly connections: Map<number, ClientConnection> = new Map()
+    private readonly connections: Map<string, ClientConnection> = new Map()
     /** Command handler */
     private readonly commandHandler: CommandHandler = new CommandHandler()
-    /** Connection ID counter */
-    private connectionIdCounter = 0
     /** Event handlers */
     private readonly eventHandlers: ServerEventHandlers = {}
     /** Error handlers */
@@ -103,14 +104,13 @@ export class NeuroServer {
      * Constructs a Neuro API server.
      * @param host The host to spawn the socket server on.
      * @param port The port to spawn the socket server on.
-     * @param onStartup A function to run when the server starts listening.
      * @param extraConfigs Extra configuration options. Currently mostly unused.
      */
-    constructor(host = "127.0.0.1", port = 8000, onStartup?: () => void, extraConfigs?: ExtraConfigOptions) {
+    constructor(host = "127.0.0.1", port = 8000, extraConfigs?: ExtraConfigOptions) {
         if (extraConfigs) this.extraConfigs = extraConfigs
-        this.wss = new WebSocketServer({ host, port }, onStartup)
+        this.wss = new WebSocketServer({ host, port }, extraConfigs?.onStartup)
 
-        this.setupEventHandlers(onStartup)
+        this.setupEventHandlers(extraConfigs?.onStartup)
         this.setupCommandHandlers()
         this.startHeartbeat()
     }
@@ -143,7 +143,7 @@ export class NeuroServer {
     }
 
     /** Send a message to a specific connection */
-    public sendToConnection(connectionId: number, message: OutgoingMessage): void {
+    public sendToConnection(connectionId: string, message: OutgoingMessage): void {
         const connection = this.connections.get(connectionId)
         if (connection && connection.socket.readyState === WebSocket.OPEN) {
             connection.socket.send(JSON.stringify(message))
@@ -199,7 +199,7 @@ export class NeuroServer {
     /** Setup WebSocket event handlers */
     private setupEventHandlers(onStartup?: () => void): void {
         this.wss.on('connection', (socket: WebSocket, _request: HttpIncomingMessage) => {
-            const connectionId = ++this.connectionIdCounter
+            const connectionId = crypto.randomUUID()
             const connection: ClientConnection = {
                 id: connectionId,
                 socket,
@@ -269,7 +269,8 @@ export class NeuroServer {
                 }
 
                 // Call event handler if defined
-                this.eventHandlers.onGameStartup?.(gameName, connection)
+                const startupData = this.eventHandlers.onGameStartup?.(gameName, connection)
+                if (startupData) connection.socket.send(JSON.stringify({ sessionId: connection.id, ...startupData }))
             }
         })
 
