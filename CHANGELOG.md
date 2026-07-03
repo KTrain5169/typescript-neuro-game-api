@@ -1,5 +1,12 @@
 <!-- markdownlint-disable -->
 
+## 0.4.0
+
+### Minor Changes
+
+- 5f9aeed: The `startup` command handler can now return an object containing the characterId and the displayName. If this object is returned, the connection will be sent back a startup acknowledgement packet, with the session ID automatically filled.
+- e999c22: BREAKING CHANGE: `onStartup` in the `NeuroServer` constructor is now moved to `extraConfigs`
+
 # neuro-game-api
 
 ## 0.3.0
