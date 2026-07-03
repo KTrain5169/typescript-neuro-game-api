@@ -9,4 +9,5 @@ export default defineConfig({
   tsconfig,
   attw: true,
   publint: true,
+  exports: {}
 })

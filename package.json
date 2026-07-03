@@ -2,9 +2,6 @@
   "name": "neuro-game-api",
   "version": "0.3.0",
   "description": "A JavaScript/TypeScript server-side API implementation of the Neuro Game API.",
-  "main": "dist/index.cjs.js",
-  "module": "dist/index.esm.js",
-  "types": "dist/index.d.ts",
   "files": [
     "dist/**/*",
     "CHANGELOG.md"
@@ -18,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KTrain5169/typescript-neuro-game-api"
+    "url": "git+https://github.com/KTrain5169/typescript-neuro-game-api.git"
   },
   "readme": "./README.md",
   "keywords": [],
@@ -48,5 +45,16 @@
     "@types/json-schema": "^7.0.15",
     "tsdown": "^0.22.3",
     "ws": "^8.18.3"
-  }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false
 }
