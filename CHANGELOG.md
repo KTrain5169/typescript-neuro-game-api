@@ -1,5 +1,11 @@
 <!-- markdownlint-disable -->
 
+## 0.4.5
+
+### Patch Changes
+
+- 10b77ea: CI please work
+
 ## 0.4.4
 
 ### Patch Changes
