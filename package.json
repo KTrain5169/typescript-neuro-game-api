@@ -11,7 +11,7 @@
     "dev": "tsdown -w",
     "prepack": "pnpm build",
     "version": "changeset version && node ./jsr-version.mjs",
-    "publish": "pnpm publish && pnpm dlx jsr publish"
+    "publish": "pnpm dlx jsr publish"
   },
   "repository": {
     "type": "git",
