@@ -1,5 +1,11 @@
 <!-- markdownlint-disable -->
 
+## 0.4.2
+
+### Patch Changes
+
+- 0517b0b: CI broke so new patch versioon to add new features added in 0.4.1
+
 ## 0.4.1
 
 ### Patch Changes
