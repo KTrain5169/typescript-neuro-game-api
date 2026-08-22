@@ -27,18 +27,15 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10.18.1
+          version: 11.x
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22.14.0
+          node-version: 24.x
           cache: "pnpm"
           cache-dependency-path: "./pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
-      
-      - name: update to latest npm to hopefully make it work?
-        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

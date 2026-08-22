@@ -6,6 +6,9 @@ A TypeScript/JavaScript API implementation of the Neuro Game API server. This im
 > If you are trying to build an integration for Neuro, you're looking for the [`neuro-game-sdk` package](https://github.com/AriesAlex/typescript-neuro-game-sdk) instead.
 > This package is for server-side implementations of the Neuro API.
 
+> [!WARNING]
+> This package does not (yet) handle upgrades to the new voice API.
+
 ## Installation & Usage
 
 Install the API:

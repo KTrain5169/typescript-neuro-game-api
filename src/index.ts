@@ -19,6 +19,8 @@ export interface ExtraConfigOptions {
     multiConnect?: boolean;
     /** Whether or not to automatically detect dead connections. Defaults to `false`. */
     autoDetectDeadConnects?: boolean;
+    /** Whether or not your server accepts the voice API. */
+    voiceApi?: boolean;
 }
 
 // Message types (what the server sends TO games)
@@ -142,6 +144,11 @@ export class NeuroServer {
         return this.commandHandler
     }
 
+    /** Register a handler */
+    public registerHandler(command: string, handler: (data: any, connection: ClientConnection) => Promise<void>) {
+        this.commandHandler.registerHandler(command, handler)
+    }
+
     /** Send a message to a specific connection */
     public sendToConnection(connectionId: string, message: OutgoingMessage): void {
         const connection = this.connections.get(connectionId)
@@ -238,7 +245,7 @@ export class NeuroServer {
                 connection.isAlive = true
             })
 
-            // Send reregister_all command to new connections
+            // Send reregister_all command to new connections (deprecated behaviour now)
             this.sendToConnection(connectionId, { command: 'actions/reregister_all' })
         })
 
@@ -259,19 +266,20 @@ export class NeuroServer {
         // Handle startup messages
         this.commandHandler.registerHandler('startup', async (data: any, connection: ClientConnection) => {
             if (!connection.gameName) {
-                const gameName = data?.game || 'unknown'
+                const gameName = (data?.game as string) || 'unknown'
                 console.log(`Connection ${connection.id} registered as game: ${gameName}`)
                 connection.gameName = gameName
-
-                // Initialize action storage for this game
-                if (!this.gameActions.has(gameName)) {
-                    this.gameActions.set(gameName, new Map())
-                }
-
-                // Call event handler if defined
-                const startupData = this.eventHandlers.onGameStartup?.(gameName, connection)
-                if (startupData) connection.socket.send(JSON.stringify({ sessionId: connection.id, ...startupData }))
             }
+            // Initialize action storage for this game
+            if (!this.gameActions.has(connection.gameName)) {
+                this.gameActions.set(connection.gameName, new Map())
+            }
+
+            // Call event handler if defined
+            const startupData = this.eventHandlers.onGameStartup?.(connection.gameName, connection)
+            if (startupData) {
+                connection.socket.send(JSON.stringify({ ...startupData, sessionId: connection.id }))
+            } else {} // backup case?
         })
 
         // Handle context messages

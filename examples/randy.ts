@@ -72,19 +72,19 @@ async function onMessageReceived(message: Message) {
 }
 
 // Register handlers with the NeuroServer
-server['commandHandler'].registerHandler('actions/register', async (data: any) => {
+server.registerHandler('actions/register', async (data: any) => {
     await onMessageReceived({ command: 'actions/register', data })
 })
 
-server['commandHandler'].registerHandler('actions/unregister', async (data: any) => {
+server.registerHandler('actions/unregister', async (data: any) => {
     await onMessageReceived({ command: 'actions/unregister', data })
 })
 
-server['commandHandler'].registerHandler('actions/force', async (data: any) => {
+server.registerHandler('actions/force', async (data: any) => {
     await onMessageReceived({ command: 'actions/force', data })
 })
 
-server['commandHandler'].registerHandler('action/result', async (data: any) => {
+server.registerHandler('action/result', async (data: any) => {
     await onMessageReceived({ command: 'action/result', data })
 })
 
