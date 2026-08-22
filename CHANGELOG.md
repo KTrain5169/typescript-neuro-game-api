@@ -1,5 +1,12 @@
 <!-- markdownlint-disable -->
 
+## 0.4.1
+
+### Patch Changes
+
+- 30a9bb7: add a proper method to register command handlers
+- 95b0311: fix tsdown being in prod deps
+
 ## 0.4.0
 
 ### Minor Changes
