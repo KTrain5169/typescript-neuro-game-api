@@ -71,21 +71,23 @@ async function onMessageReceived(message: Message) {
     }
 }
 
+server.registerEventHandler('onGameStartup', () => ({ characterId: "randy", displayName: "Randy" }))
+
 // Register handlers with the NeuroServer
-server.registerHandler('actions/register', async (data: any) => {
-    await onMessageReceived({ command: 'actions/register', data })
+server.registerEventHandler('onActionsRegistered', async (gameName, actions) => {
+    await onMessageReceived({ command: 'actions/register', data: { actions } })
 })
 
-server.registerHandler('actions/unregister', async (data: any) => {
-    await onMessageReceived({ command: 'actions/unregister', data })
+server.registerEventHandler('onActionsUnregistered', async (gameName, names) => {
+    await onMessageReceived({ command: 'actions/unregister', data: { action_names: names } })
 })
 
-server.registerHandler('actions/force', async (data: any) => {
-    await onMessageReceived({ command: 'actions/force', data })
+server.registerEventHandler('onActionsForce', async (gameName, query, actionNames, state, ephemeralContext, priority) => {
+    await onMessageReceived({ command: 'actions/force', data: { state, query, action_names: actionNames, ephemeralContext, priority } })
 })
 
-server.registerHandler('action/result', async (data: any) => {
-    await onMessageReceived({ command: 'action/result', data })
+server.registerEventHandler('onActionResult', async (gameName, actionId, success, message) => {
+    await onMessageReceived({ command: 'action/result', data: { id: actionId, success, message } })
 })
 
 async function sendAction(actionName: string) {

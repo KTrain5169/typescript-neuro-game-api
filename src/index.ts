@@ -144,9 +144,20 @@ export class NeuroServer {
         return this.commandHandler
     }
 
-    /** Register a handler */
-    public registerHandler(command: string, handler: (data: any, connection: ClientConnection) => Promise<void>) {
+    /**
+     * Register a command handler.
+     * @deprecated Use {@link NeuroServer.registerEventHandler registerEventHandler} instead.
+     */
+    public registerCommandHandler(command: string, handler: (data: any, connection: ClientConnection) => Promise<void>) {
         this.commandHandler.registerHandler(command, handler)
+    }
+
+    public registerEventHandler<const TCommand extends keyof ServerEventHandlers>(command: TCommand, handler: ServerEventHandlers[TCommand]) {
+        this.eventHandlers[command] = handler
+    }
+
+    public registerErrorHandler<const TError extends keyof ServerErrorHandlers>(handlerKey: TError, handler: ServerErrorHandlers[TError]) {
+        this.errorHandlers[handlerKey] = handler
     }
 
     /** Send a message to a specific connection */
@@ -279,7 +290,7 @@ export class NeuroServer {
             const startupData = this.eventHandlers.onGameStartup?.(connection.gameName, connection)
             if (startupData) {
                 connection.socket.send(JSON.stringify({ ...startupData, sessionId: connection.id }))
-            } else {} // backup case?
+            } else { } // backup case?
         })
 
         // Handle context messages
