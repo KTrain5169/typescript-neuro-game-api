@@ -1,5 +1,11 @@
 <!-- markdownlint-disable -->
 
+## 0.5.0
+
+### Minor Changes
+
+- 37f597a: Deprecate "registerCommandHandler" and make new "registerEventHandler" instead.
+
 ## 0.4.5
 
 ### Patch Changes
