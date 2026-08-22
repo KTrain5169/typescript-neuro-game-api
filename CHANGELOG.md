@@ -1,5 +1,11 @@
 <!-- markdownlint-disable -->
 
+## 0.4.3
+
+### Patch Changes
+
+- 03a51dd: CI fix pt 2
+
 ## 0.4.2
 
 ### Patch Changes
