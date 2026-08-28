@@ -37,21 +37,23 @@ export interface ClientConnection {
     isAlive: boolean
 }
 
+type Promiseish<T> = T | PromiseLike<T>
+
 // Event handlers for server events
 export interface ServerEventHandlers {
-    onGameStartup?: (gameName: string, connection: ClientConnection) => { characterId: string; displayName: string; } | void
-    onGameContext?: (gameName: string, message: string, silent: boolean, connection: ClientConnection) => void
-    onActionsRegistered?: (gameName: string, actions: Action[], connection: ClientConnection) => void
-    onActionsUnregistered?: (gameName: string, actionNames: string[], connection: ClientConnection) => void
-    onActionsForce?: (gameName: string, query: string, actionNames: string[], state?: string, ephemeralContext?: boolean, priority?: ActionForcePriority) => { id: string, name: string, data?: any }
-    onActionResult?: (gameName: string, actionId: string, success: boolean, message?: string) => void
+    onGameStartup?: (gameName: string, connection: ClientConnection) => Promiseish<{ characterId: string; displayName: string; } | void>
+    onGameContext?: (gameName: string, message: string, silent: boolean) => Promiseish<void>
+    onActionsRegistered?: (gameName: string, actions: Action[], connection: ClientConnection) => Promiseish<void>
+    onActionsUnregistered?: (gameName: string, actionNames: string[]) => Promiseish<void>
+    onActionsForce?: (gameName: string, query: string, actionNames: string[], state?: string, ephemeralContext?: boolean, priority?: ActionForcePriority) => Promiseish<{ id: string, name: string, data?: any }>
+    onActionResult?: (gameName: string, actionId: string, success: boolean, message?: string) => Promiseish<void>
 }
 
 // Error handlers for server errors
 export interface ServerErrorHandlers {
-    onMessageParseError?: (error: Error, rawData: Buffer, connection: ClientConnection) => void
-    onConnectionError?: (error: Error, connection: ClientConnection) => void
-    onServerError?: (error: Error) => void
+    onMessageParseError?: (error: Error, rawData: Buffer, connection: ClientConnection) => Promiseish<void>
+    onConnectionError?: (error: Error, connection: ClientConnection) => Promiseish<void>
+    onServerError?: (error: Error) => Promiseish<void>
 }
 
 export type ActionForcePriority = "low" | "medium" | "high" | "critical"
@@ -193,7 +195,7 @@ export class NeuroServer {
                 } catch (error) {
                     console.error(`Error parsing message from connection ${connectionId}:`, error)
                     if (this.errorHandlers.onMessageParseError && error instanceof Error) {
-                        this.errorHandlers.onMessageParseError(error, data, connection)
+                        await this.errorHandlers.onMessageParseError(error, data, connection)
                     }
                 }
             })
@@ -203,10 +205,10 @@ export class NeuroServer {
                 this.connections.delete(connectionId)
             })
 
-            socket.on('error', (error) => {
+            socket.on('error', async (error) => {
                 console.error(`Connection ${connectionId} error:`, error)
                 if (this.errorHandlers.onConnectionError) {
-                    this.errorHandlers.onConnectionError(error, connection)
+                    await this.errorHandlers.onConnectionError(error, connection)
                 }
             })
 
@@ -219,14 +221,13 @@ export class NeuroServer {
         })
 
         this.wss.on('listening', () => {
-            const address = this.wss.address()
             onStartup?.()
         })
 
-        this.wss.on('error', (error) => {
+        this.wss.on('error', async (error) => {
             console.error('WebSocket server error:', error)
             if (this.errorHandlers.onServerError) {
-                this.errorHandlers.onServerError(error)
+                await this.errorHandlers.onServerError(error)
             }
         })
     }
@@ -269,7 +270,7 @@ export class NeuroServer {
         } catch (error) {
             console.error(`Error handling command ${command}:`, error)
             if (this.errorHandlers.onConnectionError && error instanceof Error) {
-                this.errorHandlers.onConnectionError(error, connection)
+                await this.errorHandlers.onConnectionError(error, connection)
             }
         }
     }
@@ -286,7 +287,7 @@ export class NeuroServer {
         }
 
         // Call event handler if defined
-        const startupData = this.eventHandlers.onGameStartup?.(connection.gameName, connection)
+        const startupData = await this.eventHandlers.onGameStartup?.(connection.gameName, connection)
         if (startupData) {
             connection.socket.send(JSON.stringify({ ...startupData, sessionId: connection.id }))
         }
@@ -297,7 +298,7 @@ export class NeuroServer {
 
         // Call event handler if defined
         if (connection.gameName) {
-            this.eventHandlers.onGameContext?.(connection.gameName, data?.message || '', data?.silent || false, connection)
+            await this.eventHandlers.onGameContext?.(connection.gameName, data?.message || '', data?.silent || false)
         }
     }
 
@@ -315,7 +316,7 @@ export class NeuroServer {
         this.gameActions.set(connection.gameName, gameActions)
 
         // Call event handler if defined
-        this.eventHandlers.onActionsRegistered?.(connection.gameName, actions, connection)
+        await this.eventHandlers.onActionsRegistered?.(connection.gameName, actions, connection)
     }
 
     private async handleActionsUnregister(data: any, connection: ClientConnection): Promise<void> {
@@ -331,7 +332,7 @@ export class NeuroServer {
             })
 
             // Call event handler if defined
-            this.eventHandlers.onActionsUnregistered?.(connection.gameName, actionNames, connection)
+            await this.eventHandlers.onActionsUnregistered?.(connection.gameName, actionNames)
         }
     }
 
@@ -347,7 +348,7 @@ export class NeuroServer {
         console.log(`Action force from ${connection.gameName}: ${query} (actions: ${actionNames.join(', ')})`)
 
         // Call event handler if defined
-        const sentAction = this.eventHandlers.onActionsForce?.(connection.gameName, query, actionNames, state, ephemeralContext, priority)
+        const sentAction = await this.eventHandlers.onActionsForce?.(connection.gameName, query, actionNames, state, ephemeralContext, priority)
         if (sentAction) {
             this.sendAction(connection.gameName, sentAction.id, sentAction.name, sentAction.data)
         }
@@ -362,7 +363,7 @@ export class NeuroServer {
 
         // Call event handler if defined
         if (connection.gameName) {
-            this.eventHandlers.onActionResult?.(connection.gameName, id, success, message)
+            await this.eventHandlers.onActionResult?.(connection.gameName, id, success, message)
         }
     }
 

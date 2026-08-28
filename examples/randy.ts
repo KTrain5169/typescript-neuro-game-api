@@ -1,10 +1,9 @@
 import express from "express"
-import pkg from "body-parser"
+import { json } from "body-parser"
 import { NeuroServer, type OutgoingMessage } from "../src"
 import { generate } from "json-schema-faker"
 import util from "util"
-
-const { json } = pkg
+import assert from "assert"
 
 const app = express()
 app.use(json())
@@ -15,7 +14,9 @@ app.post("/", (req, res) => {
     res.sendStatus(200)
 })
 
-const server = new NeuroServer("127.0.0.1", 8000)
+const server = new NeuroServer("127.0.0.1", 8000, {
+    onStartup: () => console.log('Randy Neuro API server started!')
+})
 
 let actions: Action[] = []
 let pendingResult: { id: string; actionName: string } | null = null
@@ -82,15 +83,18 @@ server.registerEventHandler('onActionsUnregistered', async (gameName, names) => 
     await onMessageReceived({ command: 'actions/unregister', data: { action_names: names } })
 })
 
-server.registerEventHandler('onActionsForce', async (gameName, query, actionNames, state, ephemeralContext, priority) => {
-    await onMessageReceived({ command: 'actions/force', data: { state, query, action_names: actionNames, ephemeralContext, priority } })
+server.registerEventHandler('onActionsForce', async (_gameName, _query, actionNames) => {
+    const actionIndex = Math.floor(Math.random() * actionNames.length)
+    const action = await prepareAction(actionNames[actionIndex])
+    assert(action, "Action name isn't in the list of registered actions.")
+    return action
 })
 
 server.registerEventHandler('onActionResult', async (gameName, actionId, success, message) => {
     await onMessageReceived({ command: 'action/result', data: { id: actionId, success, message } })
 })
 
-async function sendAction(actionName: string) {
+async function prepareAction(actionName: string) {
     const id = Math.random().toString()
 
     if (actionName == "choose_name") {
@@ -101,9 +105,15 @@ async function sendAction(actionName: string) {
     const action = actions.find(a => a.name === actionName)
     if (!action) return
 
-    const responseObj = !action?.schema ? undefined : JSON.stringify(await generate(action.schema))
+    const responseObj = !action?.schema ? undefined : await generate(action.schema)
 
-    send({ command: "action", data: { id, name: action.name, data: responseObj } })
+    return { id, name: action.name, data: responseObj }
+}
+
+async function sendAction(actionName: string) {
+    const action = await prepareAction(actionName)
+    if (!action) return
+    send({ command: "action", data: { id: action.id, name: action.name, data: JSON.stringify(action.data) } })
 }
 
 export function send(msg: Message) {
