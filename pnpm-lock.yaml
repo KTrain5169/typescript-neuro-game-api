@@ -44,7 +44,7 @@ importers:
         version: 0.4.0
       json-schema-faker:
         specifier: ^0.6.2
-        version: 0.6.2
+        version: 0.6.3
       jsr:
         specifier: ^0.14.3
         version: 0.14.3
@@ -1338,8 +1338,8 @@ packages:
   jju@1.4.0:
     resolution: {integrity: sha512-8wb9Yw966OSxApiCt0K3yNJL8pnNeIv+OEq2YMidz4FKP6nonSRoOXc80iXY4JaN2FC11B9qsNmDsm+ZOfMROA==}
 
-  json-schema-faker@0.6.2:
-    resolution: {integrity: sha512-jhOV/bIUxTPM3DiKaa9YDI9UIhO6md1wBnopuIleXATBCwBxnpEfUG0KZqWJS0nTc7nGeWu6ve4vL7Sk7l2BKA==}
+  json-schema-faker@0.6.3:
+    resolution: {integrity: sha512-rsH48E/b5KFpgvKlcFjplB+zwOZk2FhYCQwcM6y09ApZkVl3D7PhcRIrDhpfR+w1AhNOrv0bumJElBz4X++KBA==}
     hasBin: true
 
   json-schema@0.4.0:
@@ -2656,7 +2656,7 @@ snapshots:
 
   jju@1.4.0: {}
 
-  json-schema-faker@0.6.2: {}
+  json-schema-faker@0.6.3: {}
 
   json-schema@0.4.0: {}
 
