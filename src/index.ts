@@ -43,41 +43,15 @@ export interface ServerEventHandlers {
     onGameContext?: (gameName: string, message: string, silent: boolean, connection: ClientConnection) => void
     onActionsRegistered?: (gameName: string, actions: Action[], connection: ClientConnection) => void
     onActionsUnregistered?: (gameName: string, actionNames: string[], connection: ClientConnection) => void
-    onActionsForce?: (gameName: string, query: string, actionNames: string[], state?: string, ephemeralContext?: boolean, priority?: ActionForcePriority) => void
+    onActionsForce?: (gameName: string, query: string, actionNames: string[], state?: string, ephemeralContext?: boolean, priority?: ActionForcePriority) => { id: string, name: string, data?: any }
     onActionResult?: (gameName: string, actionId: string, success: boolean, message?: string) => void
 }
 
 // Error handlers for server errors
 export interface ServerErrorHandlers {
     onMessageParseError?: (error: Error, rawData: Buffer, connection: ClientConnection) => void
-    onCommandHandlerError?: (error: Error, command: string, data: any, connection: ClientConnection) => void
     onConnectionError?: (error: Error, connection: ClientConnection) => void
     onServerError?: (error: Error) => void
-}
-
-// Command handler for incoming messages from games
-export class CommandHandler {
-    private handlers: Map<string, (data: any, connection: ClientConnection) => Promise<void>> = new Map()
-
-    registerHandler(command: string, handler: (data: any, connection: ClientConnection) => Promise<void>): void {
-        this.handlers.set(command, handler)
-    }
-
-    async handle(command: string, data: any, connection: ClientConnection, onError?: (error: Error, command: string, data: any, connection: ClientConnection) => void): Promise<void> {
-        const handler = this.handlers.get(command)
-        if (handler) {
-            try {
-                await handler(data, connection)
-            } catch (error) {
-                console.error(`Error handling command ${command}:`, error)
-                if (onError && error instanceof Error) {
-                    onError(error, command, data, connection)
-                }
-            }
-        } else {
-            console.warn(`Unknown command: ${command}`)
-        }
-    }
 }
 
 export type ActionForcePriority = "low" | "medium" | "high" | "critical"
@@ -90,8 +64,6 @@ export class NeuroServer {
     private readonly gameActions: Map<string, Map<string, Action>> = new Map()
     /** Currently connected clients */
     private readonly connections: Map<string, ClientConnection> = new Map()
-    /** Command handler */
-    private readonly commandHandler: CommandHandler = new CommandHandler()
     /** Event handlers */
     private readonly eventHandlers: ServerEventHandlers = {}
     /** Error handlers */
@@ -113,7 +85,6 @@ export class NeuroServer {
         this.wss = new WebSocketServer({ host, port }, extraConfigs?.onStartup)
 
         this.setupEventHandlers(extraConfigs?.onStartup)
-        this.setupCommandHandlers()
         this.startHeartbeat()
     }
 
@@ -137,19 +108,6 @@ export class NeuroServer {
     public getConnectedClients(gameName?: string): ClientConnection[] {
         const clients = Array.from(this.connections.values())
         return gameName ? clients.filter(c => c.gameName === gameName) : clients
-    }
-
-    /** Get the command handler for registering custom handlers */
-    public getCommandHandler(): CommandHandler {
-        return this.commandHandler
-    }
-
-    /**
-     * Register a command handler.
-     * @deprecated Use {@link NeuroServer.registerEventHandler registerEventHandler} instead.
-     */
-    public registerCommandHandler(command: string, handler: (data: any, connection: ClientConnection) => Promise<void>) {
-        this.commandHandler.registerHandler(command, handler)
     }
 
     public registerEventHandler<const TCommand extends keyof ServerEventHandlers>(command: TCommand, handler: ServerEventHandlers[TCommand]) {
@@ -273,103 +231,6 @@ export class NeuroServer {
         })
     }
 
-    private setupCommandHandlers(): void {
-        // Handle startup messages
-        this.commandHandler.registerHandler('startup', async (data: any, connection: ClientConnection) => {
-            if (!connection.gameName) {
-                const gameName = (data?.game as string) || 'unknown'
-                console.log(`Connection ${connection.id} registered as game: ${gameName}`)
-                connection.gameName = gameName
-            }
-            // Initialize action storage for this game
-            if (!this.gameActions.has(connection.gameName)) {
-                this.gameActions.set(connection.gameName, new Map())
-            }
-
-            // Call event handler if defined
-            const startupData = this.eventHandlers.onGameStartup?.(connection.gameName, connection)
-            if (startupData) {
-                connection.socket.send(JSON.stringify({ ...startupData, sessionId: connection.id }))
-            } else { } // backup case?
-        })
-
-        // Handle context messages
-        this.commandHandler.registerHandler('context', async (data: any, connection: ClientConnection) => {
-            console.log(`Context from ${connection.gameName}: ${data?.message} (silent: ${data?.silent})`)
-
-            // Call event handler if defined
-            if (connection.gameName) {
-                this.eventHandlers.onGameContext?.(connection.gameName, data?.message || '', data?.silent || false, connection)
-            }
-        })
-
-        // Handle action registration
-        this.commandHandler.registerHandler('actions/register', async (data: any, connection: ClientConnection) => {
-            if (!connection.gameName) return
-
-            const actions: Action[] = data?.actions || []
-            const gameActions = this.gameActions.get(connection.gameName) || new Map()
-
-            actions.forEach(action => {
-                gameActions.set(action.name, action)
-                console.log(`Registered action '${action.name}' for game '${connection.gameName}'`)
-            })
-
-            this.gameActions.set(connection.gameName, gameActions)
-
-            // Call event handler if defined
-            this.eventHandlers.onActionsRegistered?.(connection.gameName, actions, connection)
-        })
-
-        // Handle action unregistration
-        this.commandHandler.registerHandler('actions/unregister', async (data: any, connection: ClientConnection) => {
-            if (!connection.gameName) return
-
-            const actionNames: string[] = data?.action_names || []
-            const gameActions = this.gameActions.get(connection.gameName)
-
-            if (gameActions) {
-                actionNames.forEach(name => {
-                    gameActions.delete(name)
-                    console.log(`Unregistered action '${name}' for game '${connection.gameName}'`)
-                })
-
-                // Call event handler if defined
-                this.eventHandlers.onActionsUnregistered?.(connection.gameName, actionNames, connection)
-            }
-        })
-
-        // Handle action forcing (game is requesting Neuro to choose an action)
-        this.commandHandler.registerHandler('actions/force', async (data: any, connection: ClientConnection) => {
-            if (!connection.gameName) return
-
-            const actionNames: string[] = data?.action_names || []
-            const query: string = data?.query || ''
-            const state: string | undefined = data?.state
-            const ephemeralContext: boolean = data?.ephemeral_context || false
-            const priority: ActionForcePriority = data?.priority || 'low'
-
-            console.log(`Action force from ${connection.gameName}: ${query} (actions: ${actionNames.join(', ')})`)
-
-            // Call event handler if defined
-            this.eventHandlers.onActionsForce?.(connection.gameName, query, actionNames, state, ephemeralContext, priority)
-        })
-
-        // Handle action results (game reporting action execution result)
-        this.commandHandler.registerHandler('action/result', async (data: any, connection: ClientConnection) => {
-            const id: string = data?.id || ''
-            const success: boolean = data?.success || false
-            const message: string = data?.message || ''
-
-            console.log(`Action result from ${connection.gameName}: ${id} - ${success ? 'SUCCESS' : 'FAILURE'}: ${message}`)
-
-            // Call event handler if defined
-            if (connection.gameName) {
-                this.eventHandlers.onActionResult?.(connection.gameName, id, success, message)
-            }
-        })
-    }
-
     /** Handle incoming messages from game clients */
     private async handleIncomingMessage(message: any, connection: ClientConnection): Promise<void> {
         console.log(`<-- [${connection.id}] ${message.command}`, message.data || {})
@@ -379,12 +240,130 @@ export class NeuroServer {
             connection.gameName = message.game
         }
 
-        await this.commandHandler.handle(
-            message.command,
-            message.data,
-            connection,
-            this.errorHandlers.onCommandHandlerError
-        )
+        const data = message.data
+        const command = message.command
+
+        try {
+            switch (command) {
+                case 'startup':
+                    await this.handleStartup(data, connection)
+                    break
+                case 'context':
+                    await this.handleContext(data, connection)
+                    break
+                case 'actions/register':
+                    await this.handleActionsRegister(data, connection)
+                    break
+                case 'actions/unregister':
+                    await this.handleActionsUnregister(data, connection)
+                    break
+                case 'actions/force':
+                    await this.handleActionsForce(data, connection)
+                    break
+                case 'action/result':
+                    await this.handleActionResult(data, connection)
+                    break
+                default:
+                    console.warn(`Unknown command: ${command}`)
+            }
+        } catch (error) {
+            console.error(`Error handling command ${command}:`, error)
+            if (this.errorHandlers.onConnectionError && error instanceof Error) {
+                this.errorHandlers.onConnectionError(error, connection)
+            }
+        }
+    }
+
+    private async handleStartup(data: any, connection: ClientConnection): Promise<void> {
+        if (!connection.gameName) {
+            const gameName = (data?.game as string) || 'unknown'
+            console.log(`Connection ${connection.id} registered as game: ${gameName}`)
+            connection.gameName = gameName
+        }
+        // Initialize action storage for this game
+        if (!this.gameActions.has(connection.gameName)) {
+            this.gameActions.set(connection.gameName, new Map())
+        }
+
+        // Call event handler if defined
+        const startupData = this.eventHandlers.onGameStartup?.(connection.gameName, connection)
+        if (startupData) {
+            connection.socket.send(JSON.stringify({ ...startupData, sessionId: connection.id }))
+        }
+    }
+
+    private async handleContext(data: any, connection: ClientConnection): Promise<void> {
+        console.log(`Context from ${connection.gameName}: ${data?.message} (silent: ${data?.silent})`)
+
+        // Call event handler if defined
+        if (connection.gameName) {
+            this.eventHandlers.onGameContext?.(connection.gameName, data?.message || '', data?.silent || false, connection)
+        }
+    }
+
+    private async handleActionsRegister(data: any, connection: ClientConnection): Promise<void> {
+        if (!connection.gameName) return
+
+        const actions: Action[] = data?.actions || []
+        const gameActions = this.gameActions.get(connection.gameName) || new Map()
+
+        actions.forEach(action => {
+            gameActions.set(action.name, action)
+            console.log(`Registered action '${action.name}' for game '${connection.gameName}'`)
+        })
+
+        this.gameActions.set(connection.gameName, gameActions)
+
+        // Call event handler if defined
+        this.eventHandlers.onActionsRegistered?.(connection.gameName, actions, connection)
+    }
+
+    private async handleActionsUnregister(data: any, connection: ClientConnection): Promise<void> {
+        if (!connection.gameName) return
+
+        const actionNames: string[] = data?.action_names || []
+        const gameActions = this.gameActions.get(connection.gameName)
+
+        if (gameActions) {
+            actionNames.forEach(name => {
+                gameActions.delete(name)
+                console.log(`Unregistered action '${name}' for game '${connection.gameName}'`)
+            })
+
+            // Call event handler if defined
+            this.eventHandlers.onActionsUnregistered?.(connection.gameName, actionNames, connection)
+        }
+    }
+
+    private async handleActionsForce(data: any, connection: ClientConnection): Promise<void> {
+        if (!connection.gameName) return
+
+        const actionNames: string[] = data?.action_names || []
+        const query: string = data?.query || ''
+        const state: string | undefined = data?.state
+        const ephemeralContext: boolean = data?.ephemeral_context || false
+        const priority: ActionForcePriority = data?.priority || 'low'
+
+        console.log(`Action force from ${connection.gameName}: ${query} (actions: ${actionNames.join(', ')})`)
+
+        // Call event handler if defined
+        const sentAction = this.eventHandlers.onActionsForce?.(connection.gameName, query, actionNames, state, ephemeralContext, priority)
+        if (sentAction) {
+            this.sendAction(connection.gameName, sentAction.id, sentAction.name, sentAction.data)
+        }
+    }
+
+    private async handleActionResult(data: any, connection: ClientConnection): Promise<void> {
+        const id: string = data?.id || ''
+        const success: boolean = data?.success || false
+        const message: string = data?.message || ''
+
+        console.log(`Action result from ${connection.gameName}: ${id} - ${success ? 'SUCCESS' : 'FAILURE'}: ${message}`)
+
+        // Call event handler if defined
+        if (connection.gameName) {
+            this.eventHandlers.onActionResult?.(connection.gameName, id, success, message)
+        }
     }
 
     /** Start heartbeat to detect dead connections */
