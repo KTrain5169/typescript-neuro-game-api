@@ -85,7 +85,7 @@ server.registerEventHandler('onActionsUnregistered', async (gameName, names) => 
 
 server.registerEventHandler('onActionsForce', async (_gameName, _query, actionNames) => {
     const actionIndex = Math.floor(Math.random() * actionNames.length)
-    const action = await prepareAction(actionNames[actionIndex - 1])
+    const action = await prepareAction(actionNames[actionIndex])
     assert(action, "Action name isn't in the list of registered actions.")
     return action
 })
