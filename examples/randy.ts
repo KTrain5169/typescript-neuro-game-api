@@ -29,7 +29,7 @@ async function onMessageReceived(message: Message) {
 
     switch (message.command) {
         case "actions/register": {
-            actions.push(...(message.data.actions as Action[]))
+            actions.push(...message.data.actions)
             break
         }
 
@@ -127,12 +127,12 @@ export function send(msg: Message) {
     server.broadcast(msg as OutgoingMessage)
 }
 
-type Message = {
+interface Message {
     command: string,
     data?: { [key: string]: any }
 }
 
-type Action = {
+interface Action {
     name: string,
     schema: any
 }
