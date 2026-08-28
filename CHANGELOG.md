@@ -1,5 +1,18 @@
 <!-- markdownlint-disable -->
 
+## 0.6.0
+
+### Minor Changes
+
+- 1e1cb63: make action force handlers return action data to execute
+- 1e1cb63: Remove the old `commandHandlers` property, as well as remove teh `onCommandHandlerError` error handler property
+
+  It was kinda useless anyways ngl
+
+### Patch Changes
+
+- 3e8223e: Allow event handlers to return promises
+
 ## 0.5.0
 
 ### Minor Changes
