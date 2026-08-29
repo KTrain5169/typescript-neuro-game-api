@@ -58,6 +58,11 @@ export interface ServerErrorHandlers {
 
 export type ActionForcePriority = "low" | "medium" | "high" | "critical"
 
+export abstract class BaseNeuroServer {
+    public readonly wss?: WebSocketServer
+    private readonly connections: Map<string, ClientConnection> = new Map()
+}
+
 /** The NeuroServer is a class that receives connections from games and acts as Neuro */
 export class NeuroServer {
     /** The WebSocket server */
@@ -392,6 +397,178 @@ export class NeuroServer {
                 console.log('Neuro API server closed')
                 resolve()
             })
+        })
+    }
+}
+
+interface VoiceServerInputs {
+    host?: string
+    port?: number
+    spawnServer?: boolean
+    onStartup?: () => void
+}
+
+export interface IncomingAudioFrame {
+    version: 1;
+    flags: number;
+    speakerId: number;
+    samples: Float32Array;
+}
+
+type IncomingVoicePackets = {
+    command: "voice/start"
+    game: string
+} | {
+    command: "voice/stop"
+    game: string
+} | {
+    command: "voice/speakers/register"
+    game: string
+    data: {
+        speakers: {
+            id: number
+            name: string
+        }[]
+    }
+} | {
+    command: "voice/speakers/unregister"
+    game: string
+    data: {
+        ids: number[]
+    }
+} | ArrayBuffer
+
+interface VoiceEventHandlers {
+    onNewVoiceSession?: (game: string, connection: ClientConnection) => Promiseish<{ sample_rate: 48000, channels: 1 }>
+    onStopVoiceSession?: (game: string) => Promiseish<void>
+    onNewSpeakerRegistered?: (game: string, speakers: { id: number, name: string }[]) => Promiseish<void>
+    onSpeakerUnregistered?: (game: string, speakerIds: number[]) => Promiseish<void>
+    onAudioReceived?: (game: string, version: 1, flags: number, speakerId: number, audio: Float32Array) => Promiseish<void>
+}
+
+export class NeuroVoiceServer {
+    public readonly wss?: WebSocketServer
+    public readonly connections: Map<string, ClientConnection> = new Map()
+
+    public readonly eventHandlers: VoiceEventHandlers = {}
+
+    constructor({ host, port, spawnServer, onStartup }: VoiceServerInputs) {
+        if (!spawnServer || spawnServer === true) {
+            this.wss = new WebSocketServer({ host, port })
+        }
+        onStartup?.()
+    }
+
+    public decodeAudio(audio: ArrayBuffer): IncomingAudioFrame {
+        if (audio.byteLength < 4) {
+            throw new Error("Audio frame is too short");
+        }
+
+        const pcmBytes = audio.byteLength - 4
+        if (pcmBytes % 4 !== 0) {
+            throw new Error("PCm payload is not 4-byte aligned")
+        }
+
+        const view = new DataView(audio)
+
+        const version = view.getUint8(0)
+
+        if (version !== 1) {
+            throw new Error(`Binary frame sent with unsupported protocol version ${version}`)
+        }
+
+        const flags = view.getUint8(1)
+        if (flags !== 0) {
+            console.warn("Binary frame sent unsupported flags, treating as if it were 0.")
+        }
+
+        const id = view.getUint16(2, true)
+
+        const samples = new Float32Array(pcmBytes / 4)
+
+        for (let i = 0; i < samples.length; i++) {
+            samples[i] = view.getFloat32(4 + i * 4, true);
+        }
+
+        return {
+            version,
+            speakerId: id,
+            flags,
+            samples
+        }
+    }
+
+    public async handle(game: string, data: IncomingVoicePackets, connection: ClientConnection): Promise<void> {
+        if (data instanceof ArrayBuffer) {
+            await this.handleAudio(game, data)
+        } else {
+            switch (data.command) {
+                case 'voice/start': {
+                    const sessionData = await this.eventHandlers.onNewVoiceSession?.(data.game, connection)
+                    connection.socket.send(JSON.stringify(sessionData))
+                    break;
+                }
+                case 'voice/stop':
+                    await this.eventHandlers.onStopVoiceSession?.(data.game)
+                    break;
+                case 'voice/speakers/register':
+                    await this.eventHandlers.onNewSpeakerRegistered?.(data.game, data.data.speakers)
+                    break;
+                case 'voice/speakers/unregister':
+                    await this.eventHandlers.onSpeakerUnregistered?.(data.game, data.data.ids)
+                    break;
+            }
+        }
+    }
+
+    public registerEventHandler<const TEvents extends keyof VoiceEventHandlers>(event: TEvents, handler: VoiceEventHandlers[TEvents]): void {
+        this.eventHandlers[event] = handler
+    }
+
+    public async handleAudio(game: string, audio: ArrayBuffer): Promise<void> {
+        const audioData = this.decodeAudio(audio)
+        await this.eventHandlers.onAudioReceived?.(game, audioData.version, audioData.flags, audioData.speakerId, audioData.samples)
+    }
+
+    public encodeAudio(audio: Float32Array): ArrayBuffer {
+        const buffer = new ArrayBuffer(audio.length * 4)
+        const view = new DataView(buffer)
+
+        let offset = 0;
+
+        for (const a of audio) {
+            view.setFloat32(offset, a, true);
+            offset += 4;
+        }
+
+        return buffer;
+    }
+
+    public sendAudio(game: string, audio: Float32Array): void {
+        const buffer = this.encodeAudio(audio)
+        const client = this.getConnectedClients(game)
+
+        client.forEach((c) => {
+            if (c.socket.readyState === WebSocket.OPEN) {
+                c.socket.send(buffer)
+            }
+        })
+    }
+
+    /** Get currently connected clients for a game */
+    public getConnectedClients(gameName?: string): ClientConnection[] {
+        const clients = Array.from(this.connections.values())
+        return gameName ? clients.filter(c => c.gameName === gameName) : clients
+    }
+
+    public broadcastAudio(audio: Float32Array): void {
+        const buffer = this.encodeAudio(audio)
+        const client = this.getConnectedClients()
+
+        client.forEach((c) => {
+            if (c.socket.readyState === WebSocket.OPEN) {
+                c.socket.send(buffer)
+            }
         })
     }
 }
