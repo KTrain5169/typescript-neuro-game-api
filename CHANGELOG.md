@@ -1,5 +1,11 @@
 <!-- markdownlint-disable -->
 
+## 0.7.0
+
+### Minor Changes
+
+- 1344e6b: WIP NeuroVoiceServer class
+
 ## 0.6.0
 
 ### Minor Changes
