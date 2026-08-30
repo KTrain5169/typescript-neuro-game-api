@@ -70,7 +70,7 @@ export class NeuroServer {
     /** Actions currently registered per game */
     private readonly gameActions: Map<string, Map<string, Action>> = new Map()
     /** Currently connected clients */
-    private readonly connections: Map<string, ClientConnection> = new Map()
+    public readonly connections: Map<string, ClientConnection> = new Map()
     /** Event handlers */
     private readonly eventHandlers: ServerEventHandlers = {}
     /** Error handlers */
@@ -415,13 +415,17 @@ export interface IncomingAudioFrame {
     samples: Float32Array;
 }
 
-type IncomingVoicePackets = {
+interface VoiceStartPacket {
     command: "voice/start"
     game: string
-} | {
+}
+
+interface VoiceStopPacket {
     command: "voice/stop"
     game: string
-} | {
+}
+
+interface SpeakerRegisterPacket {
     command: "voice/speakers/register"
     game: string
     data: {
@@ -430,16 +434,20 @@ type IncomingVoicePackets = {
             name: string
         }[]
     }
-} | {
+}
+
+interface SpeakerUnregisterPacket {
     command: "voice/speakers/unregister"
     game: string
     data: {
         ids: number[]
     }
-} | ArrayBuffer
+}
+
+type IncomingVoicePackets = VoiceStartPacket | VoiceStopPacket | SpeakerRegisterPacket | SpeakerUnregisterPacket | ArrayBuffer
 
 interface VoiceEventHandlers {
-    onNewVoiceSession?: (game: string, connection: ClientConnection) => Promiseish<{ sample_rate: 48000, channels: 1 }>
+    onNewVoiceSession?: (game: string, connection: ClientConnection) => Promiseish<{ success: true, sample_rate: 48000, channels: 1 } | { success: false, reason: string }>
     onStopVoiceSession?: (game: string) => Promiseish<void>
     onNewSpeakerRegistered?: (game: string, speakers: { id: number, name: string }[]) => Promiseish<void>
     onSpeakerUnregistered?: (game: string, speakerIds: number[]) => Promiseish<void>
@@ -451,6 +459,7 @@ export class NeuroVoiceServer {
     public readonly connections: Map<string, ClientConnection> = new Map()
 
     public readonly eventHandlers: VoiceEventHandlers = {}
+    public readonly speakers: Map<number, string> = new Map()
 
     constructor({ host, port, spawnServer, onStartup }: VoiceServerInputs) {
         if (!spawnServer || spawnServer === true) {
@@ -466,7 +475,7 @@ export class NeuroVoiceServer {
 
         const pcmBytes = audio.byteLength - 4
         if (pcmBytes % 4 !== 0) {
-            throw new Error("PCm payload is not 4-byte aligned")
+            throw new Error("PCM payload is not 4-byte aligned")
         }
 
         const view = new DataView(audio)
@@ -504,18 +513,17 @@ export class NeuroVoiceServer {
         } else {
             switch (data.command) {
                 case 'voice/start': {
-                    const sessionData = await this.eventHandlers.onNewVoiceSession?.(data.game, connection)
-                    connection.socket.send(JSON.stringify(sessionData))
+                    await this.handleNewSession(data, connection)
                     break;
                 }
                 case 'voice/stop':
-                    await this.eventHandlers.onStopVoiceSession?.(data.game)
+                    await this.handleStopSession(data)
                     break;
                 case 'voice/speakers/register':
-                    await this.eventHandlers.onNewSpeakerRegistered?.(data.game, data.data.speakers)
+                    await this.handleNewSpeaker(data)
                     break;
                 case 'voice/speakers/unregister':
-                    await this.eventHandlers.onSpeakerUnregistered?.(data.game, data.data.ids)
+                    await this.handleRemovedSpeaker(data)
                     break;
             }
         }
@@ -550,7 +558,9 @@ export class NeuroVoiceServer {
 
         client.forEach((c) => {
             if (c.socket.readyState === WebSocket.OPEN) {
+                c.socket.send(JSON.stringify({ command: "voice/speaking", data: { speaking: true } }))
                 c.socket.send(buffer)
+                c.socket.send(JSON.stringify({ command: "voice/speaking", data: { speaking: false } }))
             }
         })
     }
@@ -559,6 +569,39 @@ export class NeuroVoiceServer {
     public getConnectedClients(gameName?: string): ClientConnection[] {
         const clients = Array.from(this.connections.values())
         return gameName ? clients.filter(c => c.gameName === gameName) : clients
+    }
+
+    private async handleNewSession(data: VoiceStartPacket, client: ClientConnection) {
+        if (!client.gameName) {
+            const gameName = data.game
+            console.log('[NeuroVoiceClient] New session started for ' + gameName)
+            client.gameName = gameName
+        }
+
+        const details = await this.eventHandlers.onNewVoiceSession?.(client.gameName, client)
+
+        if (details?.success) {
+            client.socket.send(JSON.stringify({ command: "voice/ready", data: { ...details, success: undefined } }))
+            this.connections.set(client.gameName, client)
+        } else {
+            client.socket.send(JSON.stringify({ command: "voice/unavailable", data: { ...details, success: undefined } }))
+        }
+    }
+
+    private async handleStopSession(data: VoiceStopPacket): Promise<void> {
+        const gameName = data.game
+        await this.eventHandlers.onStopVoiceSession?.(gameName)
+        this.connections.delete(gameName)
+    }
+    
+    private async handleNewSpeaker(data: SpeakerRegisterPacket) {
+        await this.eventHandlers.onNewSpeakerRegistered?.(data.game, data.data.speakers)
+        data.data.speakers.forEach((s) => this.speakers.set(s.id, s.name))
+    }
+
+    private async handleRemovedSpeaker(data: SpeakerUnregisterPacket) {
+        await this.eventHandlers.onSpeakerUnregistered?.(data.game, data.data.ids)
+        data.data.ids.forEach((i) => this.speakers.delete(i))
     }
 
     public broadcastAudio(audio: Float32Array): void {
