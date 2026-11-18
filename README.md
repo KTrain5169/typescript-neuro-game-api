@@ -6,8 +6,8 @@ A TypeScript/JavaScript API implementation of the Neuro Game API server. This im
 > If you are trying to build an integration for Neuro, you're looking for the [`neuro-game-sdk` package](https://github.com/AriesAlex/typescript-neuro-game-sdk) instead.
 > This package is for server-side implementations of the Neuro API.
 
-> [!WARNING]
-> This package does not (yet) handle upgrades to the new voice API.
+> [!NOTE]
+> Voice chat is supported through the `NeuroVoiceServer`. Attach it to a `NeuroServer`, either via the `voiceServer` extra config option or the `attachVoiceServer()` method, to serve voice connections on the same port, or run it standalone on its own port.
 
 ## Installation & Usage
 

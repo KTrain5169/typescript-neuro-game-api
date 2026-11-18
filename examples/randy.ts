@@ -1,6 +1,7 @@
 import express from "express"
 import { json } from "body-parser"
-import { NeuroServer, type OutgoingMessage } from "../src"
+import type { BaseIncomingMessage } from 'neuro-api-types'
+import { NeuroServer, type ActionToSend } from "../src"
 import { generate } from "json-schema-faker"
 import util from "util"
 import assert from "assert"
@@ -94,7 +95,7 @@ server.registerEventHandler('onActionResult', async (gameName, actionId, success
     await onMessageReceived({ command: 'action/result', data: { id: actionId, success, message } })
 })
 
-async function prepareAction(actionName: string) {
+async function prepareAction(actionName: string): Promise<ActionToSend | undefined> {
     const id = Math.random().toString()
 
     if (actionName == "choose_name") {
@@ -105,15 +106,16 @@ async function prepareAction(actionName: string) {
     const action = actions.find(a => a.name === actionName)
     if (!action) return
 
-    const responseObj = !action?.schema ? undefined : await generate(action.schema)
+    const responseObj = action.schema ? await generate(action.schema) : undefined
 
-    return { id, name: action.name, data: responseObj }
+    // The spec requires action data to be JSON-stringified before sending.
+    return { id, name: action.name, data: responseObj === undefined ? undefined : JSON.stringify(responseObj) }
 }
 
 async function sendAction(actionName: string) {
     const action = await prepareAction(actionName)
     if (!action) return
-    send({ command: "action", data: { id: action.id, name: action.name, data: JSON.stringify(action.data) } })
+    send({ command: "action", data: { id: action.id, name: action.name, data: action.data } })
 }
 
 export function send(msg: Message) {
@@ -124,7 +126,7 @@ export function send(msg: Message) {
     console.log("--->", util.inspect(msg, false, null, true))
 
     // Broadcast to all connected clients
-    server.broadcast(msg as OutgoingMessage)
+    server.broadcast(msg as BaseIncomingMessage)
 }
 
 interface Message {
