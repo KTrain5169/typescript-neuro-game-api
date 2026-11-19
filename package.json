@@ -1,6 +1,6 @@
 {
   "name": "neuro-game-api",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A JavaScript/TypeScript server-side API implementation of the Neuro Game API.",
   "files": [
     "dist/**/*",
