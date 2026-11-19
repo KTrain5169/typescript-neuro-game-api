@@ -10,8 +10,7 @@
     "build": "tsdown",
     "dev": "tsdown -w",
     "prepack": "pnpm build",
-    "version": "changeset version && node ./jsr-version.mjs",
-    "postpublish": "jsr publish"
+    "version": "changeset version && node ./jsr-version.mjs"
   },
   "repository": {
     "type": "git",
@@ -59,5 +58,15 @@
     },
     "./package.json": "./package.json"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24"
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^12"
+    }
+  }
 }

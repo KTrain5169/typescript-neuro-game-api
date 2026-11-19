@@ -8,6 +8,8 @@ on:
         paths-ignore:
             - 'examples/**'
 
+permissions: {}
+
 jobs:
     api:
         name: Build server API
@@ -15,6 +17,8 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v7
+              with:
+                persist-credentials: false
             
             - name: Setup pnpm
               uses: pnpm/action-setup@v6
